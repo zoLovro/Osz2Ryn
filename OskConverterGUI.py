@@ -98,7 +98,7 @@ class OskConverterGUI:
             background_rel = f"maps/{new_folder_name}/background.jpg"
 
         # lane map
-        lane_map = {64: 0, 192: 1, 320: 2, 448: 3}
+        lane_map = {64: 1, 192: 2, 320: 3, 448: 4}
 
         title = ""
         artist = ""
@@ -181,7 +181,7 @@ class OskConverterGUI:
                         except:
                             continue
                         end_s = end_ms / 1000.0
-                        out.write(f"note, {t_s:.3f}f, {end_s:.3f}f, {lane};\n")
+                        out.write(f"hold, {t_s:.3f}f, {end_s:.3f}f, {lane};\n")
 
         # create ONE json file
         json_path = os.path.join(output_dir, "info.json")
