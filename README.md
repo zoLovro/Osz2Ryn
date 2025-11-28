@@ -1,4 +1,4 @@
-### Ryn OSZ Converter
+### Osz2Ryn Converter
 
 This tool converts osu! `.osz` beatmap files into the folder structure used by the rhythm game **Ryn**.  
 It extracts audio, background images, metadata, and Mania note data from all `.osu` files and converts them into Ryn-compatible formats.
