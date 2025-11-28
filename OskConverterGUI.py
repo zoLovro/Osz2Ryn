@@ -100,13 +100,11 @@ class OskConverterGUI:
         # lane map
         lane_map = {64: 0, 192: 1, 320: 2, 448: 3}
 
-        # combined note file
-        note_path = os.path.join(output_dir, "noteFile.txt")
-
         title = ""
         artist = ""
+        primary_note_rel = ""
 
-        # Parse ONLY the first .osu for metadata
+        # Parse ONLY the first .osu for metadata and use its txt as main noteFile
         if osu_files:
             first_osu = osu_files[0]
             with open(first_osu, "r", encoding="utf-8") as f:
@@ -120,61 +118,70 @@ class OskConverterGUI:
                         in_meta = False
                     if in_meta:
                         if s.startswith("Title:"):
-                            title = s[6:].strip()
+                            title = s[len("Title:"):].strip()
                         elif s.startswith("Artist:"):
-                            artist = s[7:].strip()
+                            artist = s[len("Artist:"):].strip()
 
-        # convert ALL .osu into one noteFile.txt
-        with open(note_path, "w", encoding="utf-8") as out:
-            for osu in osu_files:
-                with open(osu, "r", encoding="utf-8") as inp:
-                    in_hit = False
-                    for line in inp:
-                        s = line.strip()
+            first_base = os.path.splitext(os.path.basename(first_osu))[0]
+            primary_note_rel = f"maps/{new_folder_name}/{first_base}.txt"
 
-                        if s == "[HitObjects]":
-                            in_hit = True
+        # convert EACH .osu into its own <name>.txt
+        for osu in osu_files:
+            base_name = os.path.splitext(os.path.basename(osu))[0]
+            note_filename = base_name + ".txt"
+            out_note_path = os.path.join(output_dir, note_filename)
+
+            with open(osu, "r", encoding="utf-8") as inp, \
+                 open(out_note_path, "w", encoding="utf-8") as out:
+
+                in_hit = False
+
+                for line in inp:
+                    s = line.strip()
+
+                    if s == "[HitObjects]":
+                        in_hit = True
+                        continue
+                    if s.startswith("[") and s != "[HitObjects]":
+                        in_hit = False
+
+                    if not in_hit:
+                        continue
+                    if not s:
+                        continue
+
+                    parts = s.split(",")
+                    if len(parts) < 5:
+                        continue
+
+                    try:
+                        x = int(parts[0])
+                        t_ms = int(parts[2])
+                        ty = int(parts[3])
+                    except:
+                        continue
+
+                    if x not in lane_map:
+                        continue
+
+                    lane = lane_map[x]
+                    t_s = t_ms / 1000.0
+
+                    # tap
+                    if ty == 1:
+                        out.write(f"note, {t_s:.3f}f, {lane};\n")
+
+                    # hold
+                    elif ty == 128:
+                        if len(parts) < 6:
                             continue
-                        if s.startswith("[") and s != "[HitObjects]":
-                            in_hit = False
-
-                        if not in_hit:
-                            continue
-                        if not s:
-                            continue
-
-                        parts = s.split(",")
-                        if len(parts) < 5:
-                            continue
-
+                        end_raw = parts[5].split(":")[0]
                         try:
-                            x = int(parts[0])
-                            t_ms = int(parts[2])
-                            ty = int(parts[3])
+                            end_ms = int(end_raw)
                         except:
                             continue
-
-                        if x not in lane_map:
-                            continue
-
-                        lane = lane_map[x]
-                        t_s = t_ms / 1000.0
-
-                        # tap
-                        if ty == 1:
-                            out.write(f"note, {t_s:.3f}f, {lane};\n")
-
-                        # hold
-                        elif ty == 128:
-                            if len(parts) < 6:
-                                continue
-                            end_raw = parts[5].split(":")[0]
-                            try:
-                                end_ms = int(end_raw)
-                            except:
-                                continue
-                            end_s = end_ms / 1000.0
-                            out.write(f"note, {t_s:.3f}f, {end_s:.3f}f, {lane};\n")
+                        end_s = end_ms / 1000.0
+                        out.write(f"note, {t_s:.3f}f, {end_s:.3f}f, {lane};\n")
 
         # create ONE json file
         json_path = os.path.join(output_dir, "info.json")
@@ -186,7 +193,7 @@ class OskConverterGUI:
             "audio": audio_rel,
             "audioTrimmed": f"maps/{new_folder_name}/song_trimmed.mp3",
             "background": background_rel,
-            "noteFile": f"maps/{new_folder_name}/noteFile.txt"
+            "noteFile": primary_note_rel  # points to txt from first .osu
         }
 
         with open(json_path, "w", encoding="utf-8") as jf:
